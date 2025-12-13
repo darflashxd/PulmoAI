@@ -1,23 +1,58 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import axios from 'axios';
+import trashIcon from '../assets/trash-icon.svg'; 
 
 export default function Scan() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [dragActive, setDragActive] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const selected = e.target.files[0];
-      setFile(selected);
-      setPreview(URL.createObjectURL(selected));
-      setResult(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  
+  const handleDrag = (e: React.DragEvent<HTMLFormElement | HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
     }
   };
 
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const droppedFile = e.dataTransfer.files[0];
+      handleFileProcess(droppedFile);
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    if (e.target.files && e.target.files[0]) {
+      handleFileProcess(e.target.files[0]);
+    }
+  };
+
+  const handleFileProcess = (selectedFile: File) => {
+    if (!selectedFile.type.startsWith('image/')) {
+      alert("Mohon upload file gambar (JPG/PNG)!");
+      return;
+    }
+    
+    setFile(selectedFile);
+    setPreview(URL.createObjectURL(selectedFile));
+    setResult(null);
+  };
+
   const handleUpload = async () => {
-    if (!file) return alert("Please upload an image!");
+    if (!file) return;
 
     setLoading(true);
     const formData = new FormData();
@@ -34,86 +69,132 @@ export default function Scan() {
     }
   };
 
+  const resetScan = () => {
+    setFile(null);
+    setPreview(null);
+    setResult(null);
+  };
+
   return (
-    // Wrapper ini hanya untuk menengahkan kartu di area konten
-    <div className="flex flex-col items-center justify-center p-6 w-full h-full">
-      
-      <div className="bg-white shadow-xl rounded-2xl p-8 w-full max-w-md border border-gray-200">
+    <div className="w-full xl:min-h-[88vh] flex flex-col flex-grow bg-gradient-to-r from-[#58C8FF] to-[#27FE89] px-12 xl:py-28 items-center justify-center">
+      <div className="w-full max-w-lg md:max-w-xl bg-white/10 backdrop-blur-xl border border-white/20 shadow-xl rounded-3xl p-8 pb-11 md:px-12 md:pt-10 md:pb-14">        
+        <div className="flex flex-col justify-center items-center text-white gap-1 mt-2 mb-6 xl:mb-4 ">
+            <h2 className="font-bold text-center text-2xl md:text-4xl">
+              Scan Your Lungs
+            </h2>
+            <p className="text-xs md:text-lg">
+              Upload your chest x-ray result
+            </p>
+        </div>
         
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-extrabold text-gray-800">🫁 PulmoAI</h1>
-          <p className="text-gray-500 text-sm mt-2">Deteksi Dini Tuberkulosis via X-Ray</p>
-        </div>
-
-        <div className="mb-6">
-          <label className="block mb-2 text-sm font-medium text-gray-700">Upload X-Ray Paru-paru</label>
-          <input 
-            type="file" 
-            accept="image/*"
-            onChange={handleFileChange}
-            className="block w-full text-sm text-slate-500
-              file:mr-4 file:py-2 file:px-4
-              file:rounded-full file:border-0
-              file:text-sm file:font-semibold
-              file:bg-blue-50 file:text-blue-700
-              hover:file:bg-blue-100
-              cursor-pointer border border-gray-300 rounded-lg p-2 bg-gray-50"
-          />
-        </div>
-
-        {/* PREVIEW GAMBAR */}
-        {preview && (
-          <div className="mb-6 flex justify-center">
-            <img 
-              src={preview} 
-              alt="Preview" 
-              className="h-64 w-full object-cover rounded-lg shadow-md border border-gray-200" 
+        {!preview ? (
+          <form 
+            className="relative"
+            onDragEnter={handleDrag} 
+            onSubmit={(e) => e.preventDefault()}
+          >
+            <input 
+              ref={inputRef}
+              type="file" 
+              className="hidden" 
+              accept="image/*"
+              onChange={handleChange}
             />
+
+            {/* --- UPLOAD AREA --- */}
+            <div 
+              onClick={() => inputRef.current?.click()}
+              onDragEnter={handleDrag}
+              onDragLeave={handleDrag}
+              onDragOver={handleDrag}
+              onDrop={handleDrop}
+              className={`
+                flex flex-col items-center justify-center p-8 md:p-12 border-2 border-dashed rounded-2xl transition-all duration-200 cursor-pointer
+                ${dragActive 
+                  ? "border-white bg-white/40 scale-[1.02]"
+                  : "border-white/50 bg-white/10 hover:bg-white/20 hover:border-white"} 
+              `}
+            > 
+              <div className="mb-4 text-white pointer-events-none">
+                <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+              </div>
+              
+              <p className="text-sm md:text-lg font-semibold text-white mb-1 pointer-events-none">
+                Choose a file or drag & drop it here.
+              </p>
+              <p className="text-xs md:text-base text-white/70 mb-4 pointer-events-none">
+                .jpg, .png, or .jpeg formats only.
+              </p>
+            </div>
+          </form>
+        ) : (
+          // --- PREVIEW ---
+          <div className="flex flex-col items-center">
+            <div className="relative h-52 md:h-80 xl:h-64 min-w-fit max-w-full rounded-3xl md:rounded-[2rem] xl:rounded-3xl mb-6 md:mb-8 overflow-hidden  shadow-md shadow-white/40 group">
+              <img src={preview} alt="Preview" className="w-full h-full object-contain" />
+              
+              {/* --- DELETE BUTTON --- */}
+              <button 
+                onClick={resetScan}
+                className="absolute top-4 right-4 md:top-7 md:right-6 xl:top-5 xl:right-4 transition-all hover:opacity-80"
+                title="Delete Image"
+              >
+                <img 
+                  src={trashIcon}
+                  draggable="false" 
+                  className="w-4 md:w-7 xl:w-6 object-contain animate-fade-in-up select-none" 
+                />
+              </button>
+            </div>
+
+            {/* --- UPLOAD BUTTON --- */}
+            <button 
+              onClick={handleUpload} 
+              disabled={loading}
+              className={`px-4 py-2 md:py-3 md:px-7 rounded-full text-[#4D93FF] font-semibold text-base md:text-xl xl:text-lg shadow-lg transition-all hover:opacity-90
+                ${loading 
+                  ? 'bg-gray-300 cursor-not-allowed' 
+                  : 'bg-white/95 hover:bg-gray-50 active:scale-95'
+                }`}
+            >
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-5 w-5 text-[#4D93FF]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  Analyzing...
+                </span>
+              ) : "Check Again"}
+            </button>
           </div>
         )}
 
-        {/* TOMBOL ANALISA */}
-        <button 
-          onClick={handleUpload} 
-          disabled={loading || !file}
-          className={`w-full py-3 px-4 rounded-xl text-white font-bold text-lg transition-all duration-200 shadow-lg
-            ${loading || !file 
-              ? 'bg-gray-400 cursor-not-allowed' 
-              : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-500/30 active:scale-95'
-            }`}
-        >
-          {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Menganalisa...
-            </span>
-          ) : "🔍 Analisa Sekarang"}
-        </button>
-
-        {/* HASIL PREDIKSI */}
+        {/* --- SCAN RESULT --- */}
         {result && (
-          <div className={`mt-8 p-5 rounded-xl border-2 text-center animate-fade-in-up
+          <div className={`mt-8 p-6 rounded-2xl border-[1px] text-center animate-fade-in-up backdrop-blur-sm
             ${result.label === 'Tuberculosis' 
-              ? 'bg-red-50 border-red-200 text-red-800' 
-              : 'bg-green-50 border-green-200 text-green-800'
+              ? 'border-[#1A3052]/20 text-[#1A3052] bg-white/40'
+              : 'border-white/30 text-white bg-white/5'
             }`}
           >
-            <p className="text-sm font-semibold uppercase tracking-wider mb-1">Hasil Diagnosa AI</p>
-            <h2 className="text-3xl font-bold mb-2">{result.label}</h2>
-            <div className="inline-block px-3 py-1 rounded-full bg-white/50 font-mono text-sm font-bold border border-black/5">
-              Akurasi: {result.confidence}
+            <p className="text-xs md:text-base font-semibold mb-1 md:mb-2">
+              Diagnosis Result
+            </p>
+
+            <h2 className="text-2xl md:text-4xl xl:text-[2.75rem] font-extrabold md:mb-2">
+              {result.label}
+            </h2> 
+
+            <div className={`inline-block px-4 py-1 rounded-full text-xs md:text-sm tracking-wide font-normal
+              ${result.label === 'Tuberculosis' 
+                ? 'text-[#1A3052]'
+                : 'text-white'
+              }`}
+            >
+              Confidence: {result.confidence}
             </div>
           </div>
         )}
 
       </div>
-      
-      <p className="mt-8 text-gray-400 text-xs text-center max-w-xs">
-        Disclaimer: Hasil ini adalah prediksi AI dan bukan pengganti diagnosis dokter profesional.
-      </p>
     </div>
   );
 }
