@@ -37,7 +37,9 @@ limiter = Limiter(
 
 print("Loading AI model")
 try:
-    model_path = os.path.join(os.getcwd(), 'backend', 'tb_model_light.h5')
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    model_path = os.path.join(BASE_DIR, 'tb_model_light.h5')
+
     if not os.path.exists(model_path):
         model_path = os.path.join(os.getcwd(), 'tb_model_light.h5')
     model = tf.keras.models.load_model(model_path)
@@ -127,6 +129,6 @@ def predict():
         logger.error(f"Prediction error: {e}")
         return jsonify({'error': 'An error occurred while processing the image'}), 500
 
-if __name__ == '__main__':
-    # app.run(debug=True, port=5000)
-    app.run(debug=False, port=5000)
+# if __name__ == '__main__':
+#     # app.run(debug=True, port=5000)
+#     app.run(debug=False, port=5000)
