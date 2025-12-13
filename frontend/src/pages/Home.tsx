@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import coverImage from '../assets/cover.png'; 
+import coverImage from '../assets/Cover.png'; 
 import asset1 from '../assets/Asset-01.svg'; 
 import asset2 from '../assets/Asset-02.svg'; 
 import asset3 from '../assets/Asset-04.svg'; 
