@@ -1,7 +1,7 @@
 import os
 import io
 import logging
-import magic  # Pastikan sudah pip install python-magic-bin (Windows) atau python-magic
+import magic
 import numpy as np
 import tensorflow as tf
 from flask import Flask, request, jsonify
@@ -37,9 +37,10 @@ limiter = Limiter(
 
 print("Loading AI model")
 try:
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    MODEL_PATH = os.path.join(BASE_DIR, 'tb_model.h5')
-    model = tf.keras.models.load_model(MODEL_PATH)
+    model_path = os.path.join(os.getcwd(), 'backend', 'tb_model.h5')
+    if not os.path.exists(model_path):
+        model_path = os.path.join(os.getcwd(), 'tb_model.h5')
+    model = tf.keras.models.load_model(model_path)
     print("AI ready!")
 except Exception as e:
     logger.critical(f"Failed to load model: {e}")
