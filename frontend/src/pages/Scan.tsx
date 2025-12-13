@@ -2,13 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import trashIcon from '../assets/trash-icon.svg'; 
 
-// Ambil URL dari Environment Variable (VULN-007)
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-// Konfigurasi Limitasi
-const MAX_FILE_SIZE_MB = 10; // Sesuaikan dengan Backend (10MB)
-const MAX_ATTEMPTS = 5; // Maksimal 5 kali upload
-const COOLDOWN_TIME = 60000; // Hukuman 1 menit (60.000 ms) jika spam
+const MAX_FILE_SIZE_MB = 10;
+const MAX_ATTEMPTS = 5;
+const COOLDOWN_TIME = 60000;
 
 export default function Scan() {
   const [file, setFile] = useState<File | null>(null);
@@ -17,13 +15,11 @@ export default function Scan() {
   const [loading, setLoading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   
-  // State untuk Rate Limiting Frontend
   const [attempts, setAttempts] = useState(0);
   const [isRateLimited, setIsRateLimited] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Reset rate limit setelah cooldown selesai
   useEffect(() => {
     let timer: number;
     if (isRateLimited) {
