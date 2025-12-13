@@ -100,7 +100,6 @@ def predict():
         file_stream = io.BytesIO(file.read())
         validate_image(file_stream)
         
-        # Proses Gambar
         image = Image.open(file_stream)
         processed_image = prepare_image(image)
         
