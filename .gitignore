@@ -18,6 +18,7 @@ dist/
 build/
 
 ai-model/dataset/
-*.h5
+ai-model/tb_model.h5
+
 test/
 .env
