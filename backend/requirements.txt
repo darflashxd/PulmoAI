@@ -1,6 +1,9 @@
 flask
 flask-cors
+flask-limiter
+flask-talisman
 tensorflow-cpu
 numpy
 pillow
-scipy
+python-magic
+werkzeug

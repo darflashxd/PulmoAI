@@ -82,6 +82,7 @@ def index():
     })
 
 @app.route('/predict', methods=['POST'])
+@app.route('/api/predict', methods=['POST'])
 @limiter.limit("10 per minute")
 def predict():
     if not model:
