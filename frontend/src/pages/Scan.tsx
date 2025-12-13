@@ -1,6 +1,14 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import trashIcon from '../assets/trash-icon.svg'; 
+
+// Ambil URL dari Environment Variable (VULN-007)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
+// Konfigurasi Limitasi
+const MAX_FILE_SIZE_MB = 10; // Sesuaikan dengan Backend (10MB)
+const MAX_ATTEMPTS = 5; // Maksimal 5 kali upload
+const COOLDOWN_TIME = 60000; // Hukuman 1 menit (60.000 ms) jika spam
 
 export default function Scan() {
   const [file, setFile] = useState<File | null>(null);
@@ -8,13 +16,28 @@ export default function Scan() {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  
+  // State untuk Rate Limiting Frontend
+  const [attempts, setAttempts] = useState(0);
+  const [isRateLimited, setIsRateLimited] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Reset rate limit setelah cooldown selesai
+  useEffect(() => {
+    let timer: number;
+    if (isRateLimited) {
+      timer = setTimeout(() => {
+        setIsRateLimited(false);
+        setAttempts(0);
+      }, COOLDOWN_TIME);
+    }
+    return () => clearTimeout(timer);
+  }, [isRateLimited]);
   
   const handleDrag = (e: React.DragEvent<HTMLFormElement | HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
-    
     if (e.type === "dragenter" || e.type === "dragover") {
       setDragActive(true);
     } else if (e.type === "dragleave") {
@@ -28,8 +51,7 @@ export default function Scan() {
     setDragActive(false);
 
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const droppedFile = e.dataTransfer.files[0];
-      handleFileProcess(droppedFile);
+      handleFileProcess(e.dataTransfer.files[0]);
     }
   };
 
@@ -40,9 +62,19 @@ export default function Scan() {
     }
   };
 
+  // VULN-009: Validasi Input Frontend yang Lebih Ketat
   const handleFileProcess = (selectedFile: File) => {
-    if (!selectedFile.type.startsWith('image/')) {
-      alert("Mohon upload file gambar (JPG/PNG)!");
+    // 1. Cek Tipe File
+    const validTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (!validTypes.includes(selectedFile.type)) {
+      alert("Format file tidak didukung! Harap gunakan JPG atau PNG.");
+      return;
+    }
+
+    // 2. Cek Ukuran File (VULN-011 Mitigation di sisi Client)
+    const fileSizeMB = selectedFile.size / 1024 / 1024;
+    if (fileSizeMB > MAX_FILE_SIZE_MB) {
+      alert(`File terlalu besar! Maksimal ${MAX_FILE_SIZE_MB}MB.`);
       return;
     }
     
@@ -54,16 +86,33 @@ export default function Scan() {
   const handleUpload = async () => {
     if (!file) return;
 
+    // LOGIC RATE LIMITING (Anti DDoS Sederhana)
+    if (isRateLimited) {
+      alert(`Terlalu banyak percobaan. Mohon tunggu 1 menit.`);
+      return;
+    }
+
+    if (attempts >= MAX_ATTEMPTS) {
+      setIsRateLimited(true);
+      alert("Anda telah mencapai batas upload. Silakan tunggu sebentar.");
+      return;
+    }
+
+    setAttempts(prev => prev + 1); // Tambah counter attempt
     setLoading(true);
+    
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-      const response = await axios.post('http://localhost:5000/predict', formData);
+      // Gunakan URL dari Env Variable
+      const response = await axios.post(`${API_BASE_URL}/predict`, formData);
       setResult(response.data);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Gagal connect ke server backend!");
+      // Tampilkan pesan error yang aman (jangan dump raw error)
+      const msg = error.response?.data?.error || "Gagal terhubung ke server.";
+      alert(msg);
     } finally {
       setLoading(false);
     }
@@ -78,6 +127,7 @@ export default function Scan() {
   return (
     <div className="w-full xl:min-h-[88vh] flex flex-col flex-grow bg-gradient-to-r from-[#58C8FF] to-[#27FE89] px-12 xl:py-28 items-center justify-center">
       <div className="w-full max-w-lg md:max-w-xl bg-white/10 backdrop-blur-xl border border-white/20 shadow-xl rounded-3xl p-8 pb-11 md:px-12 md:pt-10 md:pb-14">        
+        
         <div className="flex flex-col justify-center items-center text-white gap-1 mt-2 mb-6 xl:mb-4 ">
             <h2 className="font-bold text-center text-2xl md:text-4xl">
               Scan Your Lungs
@@ -103,13 +153,14 @@ export default function Scan() {
 
             {/* --- UPLOAD AREA --- */}
             <div 
-              onClick={() => inputRef.current?.click()}
+              onClick={() => !isRateLimited && inputRef.current?.click()}
               onDragEnter={handleDrag}
               onDragLeave={handleDrag}
               onDragOver={handleDrag}
               onDrop={handleDrop}
               className={`
-                flex flex-col items-center justify-center p-8 md:p-12 border-2 border-dashed rounded-2xl transition-all duration-200 cursor-pointer
+                flex flex-col items-center justify-center p-8 md:p-12 border-2 border-dashed rounded-2xl transition-all duration-200 
+                ${isRateLimited ? "cursor-not-allowed opacity-50" : "cursor-pointer"}
                 ${dragActive 
                   ? "border-white bg-white/40 scale-[1.02]"
                   : "border-white/50 bg-white/10 hover:bg-white/20 hover:border-white"} 
@@ -120,20 +171,19 @@ export default function Scan() {
               </div>
               
               <p className="text-sm md:text-lg font-semibold text-white mb-1 pointer-events-none">
-                Choose a file or drag & drop it here.
+                {isRateLimited ? "Please wait a moment..." : "Choose a file or drag & drop it here."}
               </p>
               <p className="text-xs md:text-base text-white/70 mb-4 pointer-events-none">
-                .jpg, .png, or .jpeg formats only.
+                .jpg, .png, or .jpeg formats only. Max {MAX_FILE_SIZE_MB}MB.
               </p>
             </div>
           </form>
         ) : (
           // --- PREVIEW ---
           <div className="flex flex-col items-center">
-            <div className="relative h-52 md:h-80 xl:h-64 min-w-fit max-w-full rounded-3xl md:rounded-[2rem] xl:rounded-3xl mb-6 md:mb-8 overflow-hidden  shadow-md shadow-white/40 group">
+            <div className="relative h-52 md:h-80 xl:h-64 min-w-fit max-w-full rounded-3xl md:rounded-[2rem] xl:rounded-3xl mb-6 md:mb-8 overflow-hidden shadow-md shadow-white/40 group">
               <img src={preview} alt="Preview" className="w-full h-full object-contain" />
               
-              {/* --- DELETE BUTTON --- */}
               <button 
                 onClick={resetScan}
                 className="absolute top-4 right-4 md:top-7 md:right-6 xl:top-5 xl:right-4 transition-all hover:opacity-80"
@@ -150,9 +200,9 @@ export default function Scan() {
             {/* --- UPLOAD BUTTON --- */}
             <button 
               onClick={handleUpload} 
-              disabled={loading}
+              disabled={loading || isRateLimited}
               className={`px-4 py-2 md:py-3 md:px-7 rounded-full text-[#4D93FF] font-semibold text-base md:text-xl xl:text-lg shadow-lg transition-all hover:opacity-90
-                ${loading 
+                ${loading || isRateLimited
                   ? 'bg-gray-300 cursor-not-allowed' 
                   : 'bg-white/95 hover:bg-gray-50 active:scale-95'
                 }`}
@@ -162,8 +212,15 @@ export default function Scan() {
                   <svg className="animate-spin h-5 w-5 text-[#4D93FF]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                   Analyzing...
                 </span>
-              ) : "Check Again"}
+              ) : isRateLimited ? "Limit Reached" : "Start Scanning"}
             </button>
+            
+            {/* Pesan Peringatan Rate Limit */}
+            {isRateLimited && (
+              <p className="text-red-100 text-xs mt-2 font-medium bg-red-500/20 px-3 py-1 rounded-full">
+                Too many attempts. Please wait 1 minute.
+              </p>
+            )}
           </div>
         )}
 

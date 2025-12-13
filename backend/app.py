@@ -1,44 +1,106 @@
+import os
+import io
+import logging
+import magic  # Pastikan sudah pip install python-magic-bin (Windows) atau python-magic
+import numpy as np
+import tensorflow as tf
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import tensorflow as tf
-import numpy as np
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_talisman import Talisman
+from werkzeug.utils import secure_filename
 from PIL import Image
-import io
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app)
+Talisman(app, force_https=False, content_security_policy=None)
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 
 
-print("⏳ Sedang memuat model AI 'tb_model.h5'...")
+allowed_origins = [origin.strip() for origin in os.getenv('ALLOWED_ORIGINS', 'http://localhost:5173').split(',')]
+
+CORS(app, 
+     origins=allowed_origins,
+     methods=["POST", "GET", "OPTIONS"],
+     allow_headers=["Content-Type"],
+     supports_credentials=False,
+     max_age=3600)
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+
+print("Loading AI model")
 try:
-    model = tf.keras.models.load_model('tb_model.h5')
-    print("✅ BERHASIL! Model AI siap menerima gambar.")
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    MODEL_PATH = os.path.join(BASE_DIR, 'tb_model.h5')
+    model = tf.keras.models.load_model(MODEL_PATH)
+    print("AI ready!")
 except Exception as e:
-    print("❌ ERROR FATAL: File 'tb_model.h5' tidak ditemukan!")
-    print("   Pastikan kamu sudah copy file .h5 dari folder ai-model ke folder backend.")
-    print(f"   Detail Error: {e}")
+    logger.critical(f"Failed to load model: {e}")
+    model = None
+
+ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png']
+
+def validate_image(file_stream):
+    header = file_stream.read(2048)
+    file_stream.seek(0) 
+    
+    mime = magic.Magic(mime=True)
+    file_type = mime.from_buffer(header)
+    
+    if file_type not in ALLOWED_MIME_TYPES:
+        raise ValueError(f"File extension not allowed: {file_type}")
+
+    try:
+        img = Image.open(file_stream)
+        img.verify()
+        file_stream.seek(0)
+    except Exception:
+        raise ValueError("File corrupted or not a valid image")
 
 def prepare_image(image):
     if image.mode != "RGB":
         image = image.convert("RGB")
     image = image.resize((224, 224))
     image = np.array(image)
-    
     image = image / 255.0
     image = np.expand_dims(image, axis=0)
-    
     return image
 
+@app.route('/', methods=['GET'])
+def index():
+    return jsonify({
+        "status": "server_ready",
+        "message": "PulmoAI Backend Secure API"
+    })
+
 @app.route('/predict', methods=['POST'])
+@limiter.limit("10 per minute")
 def predict():
+    if not model:
+        return jsonify({'error': 'Model AI not available'}), 503
+
     if 'file' not in request.files:
-        return jsonify({'error': 'Tidak ada file gambar yang dikirim'}), 400
+        return jsonify({'error': 'No image file uploaded'}), 400
     
     file = request.files['file']
     if file.filename == '':
-        return jsonify({'error': 'Nama file kosong'}), 400
+        return jsonify({'error': 'File name is empty'}), 400
+
+    filename = secure_filename(file.filename)
 
     try:
-        image = Image.open(io.BytesIO(file.read()))
+        file_stream = io.BytesIO(file.read())
+        validate_image(file_stream)
+        
+        # Proses Gambar
+        image = Image.open(file_stream)
         processed_image = prepare_image(image)
         
         prediction = model.predict(processed_image)
@@ -55,12 +117,14 @@ def predict():
             'label': label,
             'confidence': f"{confidence:.2f}%",
             'raw_score': score,
-            'message': 'Analisis berhasil'
+            'message': 'Analysis successful'
         })
         
+    except ValueError as ve:
+        return jsonify({'error': str(ve)}), 400
     except Exception as e:
-        print(f"Error saat prediksi: {e}")
-        return jsonify({'error': 'Gagal memproses gambar', 'details': str(e)}), 500
+        logger.error(f"Prediction error: {e}")
+        return jsonify({'error': 'An error occurred while processing the image'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
