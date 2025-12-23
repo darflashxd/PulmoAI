@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import trashIcon from '../assets/trash-icon.svg'; 
 
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+const API_BASE_URL = "http://127.0.0.1:5000";
 
 const MAX_FILE_SIZE_MB = 10;
 const MAX_ATTEMPTS = 5;
@@ -58,19 +58,16 @@ export default function Scan() {
     }
   };
 
-  // VULN-009: Validasi Input Frontend yang Lebih Ketat
   const handleFileProcess = (selectedFile: File) => {
-    // 1. Cek Tipe File
     const validTypes = ['image/jpeg', 'image/png', 'image/jpg'];
     if (!validTypes.includes(selectedFile.type)) {
-      alert("Format file tidak didukung! Harap gunakan JPG atau PNG.");
+      alert("Please upload .png or .jpg file");
       return;
     }
 
-    // 2. Cek Ukuran File (VULN-011 Mitigation di sisi Client)
     const fileSizeMB = selectedFile.size / 1024 / 1024;
     if (fileSizeMB > MAX_FILE_SIZE_MB) {
-      alert(`File terlalu besar! Maksimal ${MAX_FILE_SIZE_MB}MB.`);
+      alert(`File is too big, max ${MAX_FILE_SIZE_MB}MB.`);
       return;
     }
     
@@ -82,32 +79,29 @@ export default function Scan() {
   const handleUpload = async () => {
     if (!file) return;
 
-    // LOGIC RATE LIMITING (Anti DDoS Sederhana)
-    if (isRateLimited) {
-      alert(`Terlalu banyak percobaan. Mohon tunggu 1 menit.`);
-      return;
-    }
+    // if (isRateLimited) {
+    //   alert(`Too many attempts. Slow down!`);
+    //   return;
+    // }
 
-    if (attempts >= MAX_ATTEMPTS) {
-      setIsRateLimited(true);
-      alert("Anda telah mencapai batas upload. Silakan tunggu sebentar.");
-      return;
-    }
+    // if (attempts >= MAX_ATTEMPTS) {
+    //   setIsRateLimited(true);
+    //   alert("You have reached maximum uploads. Please wait a moment.");
+    //   return;
+    // }
 
-    setAttempts(prev => prev + 1); // Tambah counter attempt
+    setAttempts(prev => prev + 1);
     setLoading(true);
     
     const formData = new FormData();
     formData.append('file', file);
 
     try {
-      // Gunakan URL dari Env Variable
       const response = await axios.post(`${API_BASE_URL}/predict`, formData);
       setResult(response.data);
     } catch (error: any) {
       console.error(error);
-      // Tampilkan pesan error yang aman (jangan dump raw error)
-      const msg = error.response?.data?.error || "Gagal terhubung ke server.";
+      const msg = error.response?.data?.error || "Failed to connect to server.";
       alert(msg);
     } finally {
       setLoading(false);
