@@ -19,7 +19,11 @@ app = Flask(__name__)
 Talisman(app, force_https=False, content_security_policy=None)
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 
 
-allowed_origins = [origin.strip() for origin in os.getenv('ALLOWED_ORIGINS', 'http://localhost:5173').split(',')]
+allowed_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
+]
+
 
 CORS(app, 
      origins=allowed_origins,
@@ -38,10 +42,10 @@ limiter = Limiter(
 print("Loading AI model")
 try:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    model_path = os.path.join(BASE_DIR, 'tb_model_light.h5')
+    model_path = os.path.join(BASE_DIR, 'tb_model.h5')
 
     if not os.path.exists(model_path):
-        model_path = os.path.join(os.getcwd(), 'tb_model_light.h5')
+        model_path = os.path.join(os.getcwd(), 'tb_model.h5')
     model = tf.keras.models.load_model(model_path)
     print("AI ready!")
 except Exception as e:
@@ -129,6 +133,6 @@ def predict():
         logger.error(f"Prediction error: {e}")
         return jsonify({'error': 'An error occurred while processing the image'}), 500
 
-# if __name__ == '__main__':
-#     # app.run(debug=True, port=5000)
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
 #     app.run(debug=False, port=5000)

@@ -19,6 +19,11 @@ build/
 
 ai-model/dataset/
 ai-model/tb_model.h5
+test-data/
+ai-model/dataset.zip
+ai-model/tb_model_light.h5
+ai-model/minimize-model.py
 
+backend/tb_model.h5
 test/
 .env

@@ -13,6 +13,7 @@ if not os.path.exists(DATASET_DIR):
     print(f"ERROR: Dir '{DATASET_DIR}' not found!")
     exit()
 
+# Data Augmentation
 train_datagen = ImageDataGenerator(
     rescale=1./255,
     rotation_range=15,
@@ -24,6 +25,7 @@ train_datagen = ImageDataGenerator(
     validation_split=0.2
 )
 
+# Labeling for Binary Classification
 train_generator = train_datagen.flow_from_directory(
     DATASET_DIR,
     target_size=(IMG_WIDTH, IMG_HEIGHT),
@@ -43,7 +45,7 @@ validation_generator = train_datagen.flow_from_directory(
 
 print(f"Class Found: {train_generator.class_indices}")
 
-
+# model Sequential using VGG-Block
 print("Building CNN Architecture...")
 model = Sequential([
     Input(shape=(IMG_WIDTH, IMG_HEIGHT, 3)),
@@ -67,12 +69,14 @@ model = Sequential([
 ])
 
 
+# compiling
 model.compile(optimizer='adam',
               loss='binary_crossentropy',
               metrics=['accuracy'])
 
 model.summary()
 
+# Training
 print("Training Started...")
 history = model.fit(
     train_generator,
