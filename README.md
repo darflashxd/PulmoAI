@@ -42,3 +42,79 @@ Follow these steps to run the project locally.
 ```bash
 git clone [https://github.com/darflashxd/PulmoAI.git](https://github.com/darflashxd/PulmoAI.git)
 cd PulmoAI
+
+2. Backend Setup (Flask API)
+cd backend
+
+# Create Virtual Environment
+python -m venv venv
+
+# Activate Environment
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
+
+# Install Dependencies
+pip install -r requirements.txt
+
+# Run the API Server
+python app.py
+The server will start at http://127.0.0.1:5000
+
+3. Frontend Setup (React UI)
+Open a new terminal window:
+
+cd frontend
+
+# Install Node Modules
+npm install
+
+# Start Development Server
+npm run dev
+
+Access the application at http://localhost:5173
+
+📊 Model Performance Metrics
+The AI model was trained on a balanced dataset of 7,000+ Chest X-Ray images (Normal vs. Tuberculosis).
+
+Architecture: MobileNetV2 (Transfer Learning)
+
+Optimizer: Adam
+
+Loss Function: Binary Crossentropy
+
+Final Metrics:
+
+Training Accuracy: 100%
+
+Validation Accuracy: 99.65%
+
+Validation Loss: 0.0102
+
+Note: We replaced the legacy CNN architecture with MobileNetV2 to reduce model size by 90% (from ~100MB to ~9MB) while significantly improving generalization on unseen data.
+
+📂 Project Structure
+PulmoAI/
+├── ai-model/           # AI Training Scripts & Dataset Management
+│   ├── training-model.py
+│   └── dataset/        # (Not uploaded to save space)
+├── backend/            # Flask API Server
+│   ├── app.py
+│   ├── tb_model.h5     # The Trained AI Model (Binary)
+│   └── requirements.txt
+├── frontend/           # React Application
+│   ├── src/
+│   ├── vite.config.ts
+│   └── tailwind.config.js
+└── README.md           # Documentation
+
+🤝 Contribution & Credits
+This project is a collaborative effort.
+
+System Refactoring & AI Optimization: darflashxd
+
+Original Concept: agileorc
+
+⚠️ Disclaimer
+This tool is intended for educational and research purposes only. It should not be used as a substitute for professional medical diagnosis.
