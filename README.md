@@ -114,7 +114,7 @@ This project is a collaborative effort.
 
 System Refactoring & AI Optimization: darflashxd
 
-Original Concept: agileorc
+Original Concept: agileorc, darflashxd
 
 ⚠️ Disclaimer
 This tool is intended for educational and research purposes only. It should not be used as a substitute for professional medical diagnosis.
