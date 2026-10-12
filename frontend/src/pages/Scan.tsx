@@ -205,7 +205,7 @@ export default function Scan() {
               ) : isRateLimited ? "Limit Reached" : "Start Scanning"}
             </button>
             
-            {/* Pesan Peringatan Rate Limit */}
+            {/* Rate limit warning */}
             {isRateLimited && (
               <p className="text-red-100 text-xs mt-2 font-medium bg-red-500/20 px-3 py-1 rounded-full">
                 Too many attempts. Please wait 1 minute.

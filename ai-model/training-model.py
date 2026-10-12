@@ -1,32 +1,31 @@
+import os
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, Dropout, Input, GlobalAveragePooling2D
 from tensorflow.keras.applications import MobileNetV2
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
-import os
 
-# --- KONFIGURASI ---
-DATASET_DIR = 'dataset'  # Pastikan struktur folder: dataset/Normal dan dataset/Tuberculosis
+# Configuration
+DATASET_DIR = 'dataset'  # Expected directory layout: dataset/Normal and dataset/Tuberculosis
 IMG_WIDTH, IMG_HEIGHT = 224, 224
 BATCH_SIZE = 32
-EPOCHS = 20  # Bisa dinaikin karena kita pake EarlyStopping
+EPOCHS = 20
 
-# Cek Folder
+# Validate dataset directory
 if not os.path.exists(DATASET_DIR):
-    print(f"CRITICAL ERROR: Folder '{DATASET_DIR}' tidak ditemukan!")
-    print("Struktur folder harus:")
+    print(f"Error: Dataset directory '{DATASET_DIR}' not found.")
+    print("Expected structure:")
     print("ai-model/")
     print("  ├── dataset/")
     print("  │    ├── Normal/")
     print("  │    └── Tuberculosis/")
     print("  └── training-model.py")
-    exit()
+    exit(1)
 
-# --- DATA AUGMENTATION ---
-# Kita bikin variasi gambar biar model gak ngafal mati
+# Data augmentation
 train_datagen = ImageDataGenerator(
-    rescale=1./255,
+    rescale=1.0 / 255,
     rotation_range=20,
     width_shift_range=0.1,
     height_shift_range=0.1,
@@ -36,7 +35,7 @@ train_datagen = ImageDataGenerator(
     validation_split=0.2
 )
 
-print("Memuat Data...")
+print("Loading training and validation sets...")
 train_generator = train_datagen.flow_from_directory(
     DATASET_DIR,
     target_size=(IMG_WIDTH, IMG_HEIGHT),
@@ -54,48 +53,53 @@ validation_generator = train_datagen.flow_from_directory(
     subset='validation'
 )
 
-print(f"Mapping Kelas: {train_generator.class_indices}")
+print(f"Class mapping: {train_generator.class_indices}")
 
-# --- ARSITEKTUR MOBILENETV2 (Transfer Learning) ---
-print("Membangun Arsitektur MobileNetV2...")
+# MobileNetV2 transfer learning architecture
+print("Building MobileNetV2 model...")
 
-# 1. Ambil Base Model (Tanpa bagian "Top" atau kepalanya)
-# weights='imagenet' artinya kita pake otak yang udah pinter
 base_model = MobileNetV2(
-    weights='imagenet', 
-    include_top=False, 
+    weights='imagenet',
+    include_top=False,
     input_shape=(IMG_WIDTH, IMG_HEIGHT, 3)
 )
 
-# 2. Bekukan Base Model (Biar ilmu lamanya gak ilang)
-base_model.trainable = False 
+# Freeze base model weights
+base_model.trainable = False
 
-# 3. Bikin Kepala Baru (Custom Head)
+# Custom classification head
 x = base_model.output
-# GlobalAveragePooling2D adalah KUNCI biar file KECIL. 
-# Dia merangkum fitur tanpa Flatten yang boros parameter.
-x = GlobalAveragePooling2D()(x) 
-x = Dense(64, activation='relu')(x) # Dense layer kecil aja cukup
-x = Dropout(0.5)(x) # Biar gak overfitting
-outputs = Dense(1, activation='sigmoid')(x) # Output Binary (0 atau 1)
+x = GlobalAveragePooling2D()(x)
+x = Dense(64, activation='relu')(x)
+x = Dropout(0.5)(x)
+outputs = Dense(1, activation='sigmoid')(x)
 
 model = Model(inputs=base_model.input, outputs=outputs)
 
-model.compile(optimizer='adam',
-              loss='binary_crossentropy',
-              metrics=['accuracy'])
+model.compile(
+    optimizer='adam',
+    loss='binary_crossentropy',
+    metrics=['accuracy']
+)
 
 model.summary()
 
-# --- CALLBACKS (Fitur Pintar) ---
-# 1. EarlyStopping: Berhenti otomatis kalau akurasi mentok (biar gak buang waktu)
-early_stop = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+# Training callbacks
+early_stop = EarlyStopping(
+    monitor='val_loss',
+    patience=5,
+    restore_best_weights=True
+)
 
-# 2. ModelCheckpoint: Selalu simpan versi TERBAIK, bukan versi terakhir
-checkpoint = ModelCheckpoint('tb_model.h5', monitor='val_accuracy', save_best_only=True, mode='max')
+checkpoint = ModelCheckpoint(
+    'tb_model.h5',
+    monitor='val_accuracy',
+    save_best_only=True,
+    mode='max'
+)
 
-# --- TRAINING ---
-print("Training Dimulai...")
+# Training loop
+print("Starting model training...")
 history = model.fit(
     train_generator,
     steps_per_epoch=train_generator.samples // BATCH_SIZE,
@@ -105,4 +109,4 @@ history = model.fit(
     callbacks=[early_stop, checkpoint]
 )
 
-print("DONE! Model terbaik tersimpan sebagai 'tb_model.h5'")
+print("Training finished. Optimal model weights saved to 'tb_model.h5'.")
